@@ -39,9 +39,10 @@ while True:
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(100,100))
  
     for (x, y, w, h) in faces:
+            if(w < 100 and h < 100): continue
 
             face = frame[y:y+h, x:x+w]
 
@@ -60,6 +61,7 @@ while True:
             name = le.classes_[j]
             if(name == "unknow"):
                 print(name)
+                continue
                 
             text = "{}: {:.2f}%".format(name, proba * 100)
             
