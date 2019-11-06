@@ -2,9 +2,15 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 import argparse
 import pickle
+import os
+
+cwd = os.getcwd()
+pathSeparator = "/"
+if "\\" in cwd:
+    pathSeparator = "\\"
 
 print("[INFO] loading face embeddings...")
-data = pickle.loads(open("C:\\Users\\Acer\\Documents\\GitHub\\hello\\output\\embeddings.pickle", "rb").read())
+data = pickle.loads(open(cwd + pathSeparator +"output" + pathSeparator + "embeddings.pickle", "rb").read())
 
 print("[INFO] encoding labels...")
 le = LabelEncoder()
@@ -19,12 +25,12 @@ recognizer.fit(data["embeddings"], labels)
 
 
 # write the actual face recognition model to disk
-f = open("C:\\Users\\Acer\\Documents\\GitHub\\hello\\output\\recognizer.pickle", "wb")
+f = open(cwd + pathSeparator +"output" + pathSeparator + "recognizer.pickle", "wb")
 f.write(pickle.dumps(recognizer))
 f.close()
  
 # write the label encoder to disk
-f = open("C:\\Users\\Acer\\Documents\\GitHub\\hello\\output\\le.pickle", "wb")
+f = open(cwd + pathSeparator +"output" + pathSeparator + "le.pickle", "wb")
 f.write(pickle.dumps(le))
 f.close()
 

@@ -6,6 +6,11 @@ import imutils
 import pickle
 import cv2
 import os
+
+cwd = os.getcwd()
+pathSeparator = "/"
+if "\\" in cwd:
+    pathSeparator = "\\"
  
 # construct the argument parser and parse the arguments
 # ap = argparse.ArgumentParser()
@@ -34,7 +39,7 @@ embedder = cv2.dnn.readNetFromTorch("nn4.small2.v1.t7")
 
 # grab the paths to the input images in our dataset
 print("[INFO] quantifying faces...")
-imagePaths = list(paths.list_images("C:\\Users\\Acer\\Documents\\GitHub\\hello\\dataset"))
+imagePaths = list(paths.list_images(cwd + pathSeparator + "dataset"))
  
 # initialize our lists of extracted facial embeddings and
 # corresponding people names
@@ -117,6 +122,6 @@ for (i, imagePath) in enumerate(imagePaths):
 # dump the facial embeddings + names to disk
 print("[INFO] serializing {} encodings...".format(total))
 data = {"embeddings": knownEmbeddings, "names": knownNames}
-f = open("C:\\Users\\Acer\\Documents\\GitHub\\hello\\output\\embeddings.pickle", "wb")
+f = open(cwd + pathSeparator +"output" + pathSeparator + "embeddings.pickle", "wb")
 f.write(pickle.dumps(data))
 f.close()

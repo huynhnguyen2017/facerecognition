@@ -19,79 +19,15 @@ if "\\" in cwd:
     pathSeparator = "\\"
 
 
-# cascPath = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-# recognizeResult = ''
-
-
-# print("[INFO] loading face recognizer...")
-# embedder = cv2.dnn.readNetFromTorch("nn4.small2.v1.t7")
-
-
-# recognizer = pickle.loads(open("C:\\Users\\Acer\\Documents\\GitHub\\hello\\output\\recognizer.pickle", "rb").read())
-# le = pickle.loads(open("C:\\Users\\Acer\\Documents\\GitHub\\hello\\output\\le.pickle", "rb").read())
-
-
-
-# face_cascade = cv2.CascadeClassifier(cascPath)
-
-# def recognize(frame):
-#     result = None
-
-#     global recognizeResult
-
-#     frame = imutils.resize(frame, width=600)
-    
-#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-#     faces = face_cascade.detectMultiScale(gray, 1.3, 1)
- 
-#     for (x, y, w, h) in faces:
-
-#         face = frame[y:y+h, x:x+w]
-
-#         faceBlob = cv2.dnn.blobFromImage(face, 1.0 / 255, (96, 96),
-#             (0, 0, 0), swapRB=True, crop=False)
-
-#         embedder.setInput(faceBlob)
-#         vec = embedder.forward()
-        
-#         # perform classification to recognize the face
-#         preds = recognizer.predict_proba(vec)[0]
-#         j = np.argmax(preds)
-#         proba = preds[j]
-#         if(proba < 0.3):
-#             continue
-#         name = le.classes_[j]
-#         if(name == "unknow"):
-#             print(name)
-#             continue
-#         recognizeResult = name
-#         text = "{}: {:.2f}%".format(name, proba * 100)
-        
-#         cv2.rectangle(frame, (x,y), (x + w, y + h,), (255, 0, 0, 0), 2)
-#         cv2.putText(frame, text, (x, y),cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
-#         result = frame
-#     return result
-
-
-###############################################################################
-
-# construct the argument parser and parse the arguments
-# ap = argparse.ArgumentParser()
-# check = False
-# ap.add_argument("-c", "--confidence", type=float, default=0.5,
-#                 help="minimum probability to filter weak detections")
-# args = vars(ap.parse_args())
-
 # load our serialized face detector from disk
 print("[INFO] loading face detector...")
 detector = cv2.dnn.readNetFromCaffe(cwd + pathSeparator + "facerecognition-master" + pathSeparator 
     + "face_detection_model" + pathSeparator + "deploy.prototxt", 
     cwd + pathSeparator + "facerecognition-master" + pathSeparator 
     + "face_detection_model" + pathSeparator + "res10_300x300_ssd_iter_140000.caffemodel")
+    
 # protoPath = os.path.sep.join(["face_detection_model", "deploy.prototxt"])
-# modelPath = os.path.sep.join(["face_detection_model",
-#                               "res10_300x300_ssd_iter_140000.caffemodel"])
+# modelPath = os.path.sep.join(["face_detection_model", "res10_300x300_ssd_iter_140000.caffemodel"])
 # detector = cv2.dnn.readNetFromCaffe(protoPath, modelPath)
 
 # load our serialized face embedding model from disk
@@ -101,7 +37,6 @@ embedder = cv2.dnn.readNetFromTorch("nn4.small2.v1.t7")
 # load the actual face recognition model along with the label encoder
 recognizer = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "recognizer.pickle", "rb").read())
 le = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "le.pickle", "rb").read())
-
 
 def ten_image_average(frames):
     stackprob = {}
@@ -187,9 +122,6 @@ def ten_image_average(frames):
         return (maxi, max_value, None)
     return (maxi, max_value, named_frame[name])
 
-
-def run(frameLists):
-    return ten_image_average(frameLists)
 
 def storeByteTypeImageToDisk(img, image_path):
     image = Image.open(io.BytesIO(img))
@@ -354,70 +286,38 @@ def train(clientSocket, clientSocketArrdress, clientSocketPort):
     # clientSocket.sendall(b"TRAIN_SUCCESS\n")
 
 
-# def recognize_And_Response_Result():
-    
+def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSocketPort):
+    arrayOfByte = bytearray()
+    while(True):
+        clientSocket.sendall(b"OK\n")
+        try:
+            byteReceived = bytearray(clientSocket.recv(1024))
+        except ConnectionResetError:
+            print("Connection reset")
+            return
 
+        print("Bytes received: ", len(byteReceived))
 
-def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort):
-    print ("Connection from : " + clientSocketArrdress + ":" + str(clientSocketPort))
-    clientSignal = ""
-    # clientSocket.sendall(b"OK\n")
-    # f = open(system_path, "wb")
-    while True:
-        print("begin")
-        listOfByteArray = []
-        frameList = []
-        arrayOfByte = bytearray()
-        while True:
-            try:
-                byteReceived = bytearray(clientSocket.recv(1024*1024))
-            except ConnectionResetError:
-                cv2.destroyAllWindows()
-                print("Connection reset")
+        if(byteReceived[-1] == 10):
+            byteReceived.pop(-1)
+            signal = byteReceived.decode("utf-8")
+            print(signal)
+            if(signal == "EXIT"):
                 return
-
-            print("Bytes received: ", len(byteReceived))
-
-            if(byteReceived[-1] == 10):
-                byteReceived.pop(-1)
-                clientSignal = byteReceived.decode("utf-8")
-                print(clientSignal)
-                if(clientSignal == "TRAIN"):
-                    print("train")
-                    train(clientSocket, clientSocketArrdress, clientSocketPort)
-                    continue
-                if(clientSignal == "RECOGNIZE"):
-                    print("recognize")
-                    clientSocket.sendall(b"OK\n")
-                    continue
-                
-
-            if(byteReceived[-1] == 254):
-                print("BREAK Receive client request process")
-                byteReceived.pop(-1)
-                arrayOfByte += byteReceived
-                break
-
-            arrayOfByte += byteReceived
-
+        
+        arrayOfByte = handle_Image_Send_From_Client(clientSocket, clientSocketArrdress, clientSocketPort)
         listOfByteArray = splitArrayOfByte(arrayOfByte)
-
         print("Amounts of frame received: ", len(listOfByteArray))
-
-        # break
-
-        frameList = convert_ByteDataArray_To_Mat(listOfByteArray)
-
-        print("Amounts of frame after decode from String to Mat type: ", len(frameList))
-
-
+        # byteArray = decode_StringList_To_Byte(listOfByteArray)
+        imageList = convert_ByteDataArray_To_Mat(listOfByteArray)
+        print("Amounts of frame after decode from String to Mat type: ", len(imageList))
 
         #loop to get final frame in framelist
-        for frame in frameList:
+        for frame in imageList:
             count = 1
-            cv2.imshow('img', frame)
-            if cv2.waitKey(0) & 0xFF == ord('q'):
-                cv2.destroyAllWindows()
+            # cv2.imshow('img', frame)
+            # if cv2.waitKey(0) & 0xFF == ord('q'):
+            #     cv2.destroyAllWindows()
                 
         #Recognize Process using harrcascades to detect face and coffe model to recognize face
         # frame = recognize(frame)
@@ -430,7 +330,7 @@ def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort):
 
         #Recognize Process using deep learning to detect face and coffe model to recognize face
         try:
-            (name, proba, frame) = run(frameList)
+            (name, proba, frame) = ten_image_average(imageList)
             recognizeResult = name
         except:
             frame = None
@@ -467,7 +367,7 @@ def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort):
         clientSocket.sendall(b"IMAGE\n")
         clientSocket.sendall(image_data)
         clientSocket.sendall(b"\n")
-        clientSocket.sendall(b"OK\n")
+        clientSocket.sendall(b"DONE\n")
         ##################################################################
 
         # print(recognizeResult)
@@ -480,9 +380,46 @@ def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort):
         # clientSocket.sendall(recognizeResult.encode())
         clientSocket.sendall(name.encode())
         clientSocket.sendall(b"\n")
-        clientSocket.sendall(b"OK\n")
+        clientSocket.sendall(b"DONE\n")
+
+            
+    
+
+
+def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort):
+    print ("Connection from : " + clientSocketArrdress + ":" + str(clientSocketPort))
+    clientSignal = ""
+    # clientSocket.sendall(b"OK\n")
+    # f = open(system_path, "wb")
+    while True:
+        print("begin")
+        while True:
+            try:
+                byteReceived = bytearray(clientSocket.recv(1024))
+            except ConnectionResetError:
+                cv2.destroyAllWindows()
+                print("Connection reset")
+                return
+
+            print("Bytes received: ", len(byteReceived))
+
+            if(byteReceived[-1] == 10):
+                byteReceived.pop(-1)
+                clientSignal = byteReceived.decode("utf-8")
+                print(clientSignal)
+                if(clientSignal == "TRAIN"):
+                    print("train")
+                    train(clientSocket, clientSocketArrdress, clientSocketPort)
+                if(clientSignal == "RECOGNIZE"):
+                    print("recognize")
+                    recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSocketPort)
+                    
+        # break
     clientSocket.close()
     return
+
+
+    
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind(('', 5555))
