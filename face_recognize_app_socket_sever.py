@@ -38,11 +38,15 @@ embedder = cv2.dnn.readNetFromTorch("nn4.small2.v1.t7")
 recognizer = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "recognizer.pickle", "rb").read())
 le = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "le.pickle", "rb").read())
 
-def ten_image_average(frames):
+def ten_image_average(frames, lock):
     stackprob = {}
     track_stack = {}
     named_frame = {}
+    
     for frame in frames:
+        # lock all global var using in recognize
+        lock.acquire()
+
         frame = imutils.resize(frame, width=600)
         (h, w) = frame.shape[:2]
         # print("shape ", frame.shape)
@@ -110,6 +114,8 @@ def ten_image_average(frames):
                 cv2.putText(frame, text, (startX, y),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
+        # release all global var using in recognize
+        lock.release()
     try:
         # get maximum value from dictionay
         maxi = max(stackprob.items(), key=operator.itemgetter(1))[0]
@@ -212,9 +218,10 @@ def splitArrayOfByte(arrayOfByte):
     return listOfByteArray
 
 
-def collectStaticData(imageArray):  # path point to folder including dataset
+def collectStaticData(imageArray, lock):  # path point to folder including dataset
     faceArray = []
     for image in imageArray:
+        lock.acquire()
         # take image from file
         # frame = cv2.imread(image)
         frame = image
@@ -251,7 +258,7 @@ def collectStaticData(imageArray):  # path point to folder including dataset
                 roi_color = frame
                 faceArray.append(roi_color)
                 # cv2.imwrite(image, roi_color) # save image into old file with path (  image variable )
-
+        lock.release()
     return faceArray
 
 
@@ -264,13 +271,14 @@ def readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPor
             print("Connection reset")
             return
             
-        print("Bytes received: ", len(byteReceived))
+        # print("Bytes received: ", len(byteReceived))
 
         if(byteReceived[0] != 10):
             signal += byteReceived.decode("utf-8")
             continue
 
         if(byteReceived[0] == 10):
+            print("BREAK ReadLine process")
             print(signal)
             break
     return signal
@@ -283,22 +291,22 @@ def convertMatFrameTypeToByteFrameType(frame):
     im_data = output.getvalue()
     return im_data
 
-def realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort):
+def realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort, lock):
     arrayOfByte = bytearray()
     clientSocket.sendall(b"OK\n")
     while(True):
-        # signal = readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPort)
-        # if(signal == "EXIT"):
-        #     break
+        signal = readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPort)
+        if(signal == "EXIT"):
+            break
         arrayOfByte = handle_Image_Send_From_Client(clientSocket, clientSocketArrdress, clientSocketPort)
         listOfByteArray = splitArrayOfByte(arrayOfByte)
         if(len(listOfByteArray) == 1):
             imageArray = convert_ByteDataArray_To_Mat(listOfByteArray)
             faceArray = imageArray
-            faceArray = collectStaticData(imageArray)
-            # if(len(faceArray) != 1):
-            #     clientSocket.sendall(b"FAILURE\n")
-            #     continue
+            faceArray = collectStaticData(imageArray, lock)
+            if(len(faceArray) != 1):
+                clientSocket.sendall(b"FAILURE\n")
+                continue
             im_data = convertMatFrameTypeToByteFrameType(faceArray[-1])
             image_data = base64.b64encode(im_data)
             clientSocket.sendall(b"IMAGE\n")
@@ -331,7 +339,7 @@ def train(clientSocket, clientSocketArrdress, clientSocketPort):
     # clientSocket.sendall(b"TRAIN_SUCCESS\n")
 
 
-def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSocketPort):
+def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSocketPort, lock):
     arrayOfByte = bytearray()
     clientSocket.sendall(b"OK\n")
     arrayOfByte = handle_Image_Send_From_Client(clientSocket, clientSocketArrdress, clientSocketPort)
@@ -361,7 +369,7 @@ def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSock
 
     #Recognize Process using deep learning to detect face and coffe model to recognize face
     try:
-        (name, proba, frame) = ten_image_average(imageList)
+        (name, proba, frame) = ten_image_average(imageList, lock)
         print(name)
         recognizeResult = name
     except:
@@ -416,7 +424,7 @@ def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSock
     clientSocket.sendall(b"DONE\n")
     
 
-def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort):
+def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort, lock):
     print ("Connection from : " + clientSocketArrdress + ":" + str(clientSocketPort))
     clientSignal = ""
     # clientSocket.sendall(b"OK\n")
@@ -441,10 +449,10 @@ def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort):
                 train(clientSocket, clientSocketArrdress, clientSocketPort)
             if(clientSignal == "RECOGNIZE"):
                 print("recognize")
-                recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSocketPort)
+                recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSocketPort, lock)
             if(clientSignal == "DETECT"):
                 print("detect")
-                realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort)
+                realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort, lock)
                 
         # break
     clientSocket.close()
@@ -464,6 +472,7 @@ while True:
     # print("last byte: ", temp[len(temp) - 1])
     # temp.remove(temp[len(temp) - 1])
     # print("last byte: ", len(temp))
-    t = threading.Thread(target=handlle_client, args=(cli, remhost, remport))
+    lock = threading.Lock()
+    t = threading.Thread(target=handlle_client, args=(cli, remhost, remport, lock))
     t.start()
 
