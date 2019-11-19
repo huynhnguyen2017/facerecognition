@@ -19,6 +19,11 @@ if "\\" in cwd:
     pathSeparator = "\\"
 
 
+cascPath = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+cascEyePath = cv2.data.haarcascades + 'haarcascade_eye.xml'
+
+
+
 # load our serialized face detector from disk
 print("[INFO] loading face detector...")
 detector = cv2.dnn.readNetFromCaffe(cwd + pathSeparator + "facerecognition-master" + pathSeparator 
@@ -38,15 +43,20 @@ embedder = cv2.dnn.readNetFromTorch("nn4.small2.v1.t7")
 recognizer = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "recognizer.pickle", "rb").read())
 le = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "le.pickle", "rb").read())
 
+face_cascade = cv2.CascadeClassifier(cascPath)
+eye_cascade = cv2.CascadeClassifier(cascEyePath)
+
 def ten_image_average(frames, lock):
     stackprob = {}
     track_stack = {}
     named_frame = {}
-    
+    print("begin recognize")
+    lock.acquire()
     for frame in frames:
         # lock all global var using in recognize
-        lock.acquire()
-
+        print("begin recognize")
+        
+        print("begin recognize")
         frame = imutils.resize(frame, width=600)
         (h, w) = frame.shape[:2]
         # print("shape ", frame.shape)
@@ -115,7 +125,8 @@ def ten_image_average(frames, lock):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
         # release all global var using in recognize
-        lock.release()
+
+    lock.release()   
     try:
         # get maximum value from dictionay
         maxi = max(stackprob.items(), key=operator.itemgetter(1))[0]
@@ -143,15 +154,18 @@ def storeListOfMatTypeImageToDisk(imgList, imagePath):
         storeMatTypeImageToDisk(img, imagePath + str(count) + ".jpg")
         count += 1
 
-def createFolder(folderName):
+def createFolder(folderPath):
     cwd = os.getcwd()
     pathSeparator = "/"
     if "\\" in cwd:
         pathSeparator = "\\"
-    image_path = cwd + pathSeparator + "TrainImage" + pathSeparator + folderName
-    if not os.path.exists(image_path):
-        os.makedirs(image_path)
-    return image_path + pathSeparator
+    if not os.path.exists(folderPath):
+        os.makedirs(folderPath)
+    return folderPath + pathSeparator
+
+def removeFolder(folderPath):
+    if os.path.exists(folderPath):
+        os.remove(folderPath)   
 
 def handle_Image_Send_From_Client(clientSocket, clientSocketArrdress, clientSocketPort):
     arrayOfByte = bytearray()
@@ -216,6 +230,22 @@ def splitArrayOfByte(arrayOfByte):
         listOfByteArray.append(arrayOfByte[:x])
         arrayOfByte = arrayOfByte[x + 1:]
     return listOfByteArray
+
+def faceDectectUsingHaarcascade(frames):
+    faceArray = []
+    for frame in frames:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(100,100))
+        for (x, y, w, h) in faces:
+            if(w < 100 and h < 100): continue
+            roi_gray = gray[y:y+h, x:x+w]
+            eyes = eye_cascade.detectMultiScale(roi_gray)
+            for (ex,ey,ew,eh) in eyes:
+                cv2.rectangle(frame, (x,y), (x + w, y + h,), (255, 0, 0, 0), 2)
+                faceArray.append(frame)   
+    return faceArray
+
+
 
 
 def collectStaticData(imageArray, lock):  # path point to folder including dataset
@@ -291,9 +321,38 @@ def convertMatFrameTypeToByteFrameType(frame):
     im_data = output.getvalue()
     return im_data
 
+# def realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort, lock):
+#     arrayOfByte = bytearray()
+#     clientSocket.sendall(b"OK\n")
+#     while(True):
+#         signal = readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPort)
+#         if(signal == "EXIT"):
+#             break
+#         arrayOfByte = handle_Image_Send_From_Client(clientSocket, clientSocketArrdress, clientSocketPort)
+#         listOfByteArray = splitArrayOfByte(arrayOfByte)
+#         if(len(listOfByteArray) == 1):
+#             imageArray = convert_ByteDataArray_To_Mat(listOfByteArray)
+#             faceArray = imageArray
+#             # faceArray = collectStaticData(imageArray, lock)
+#             faceArray = faceDectectUsingHaarcascade(imageArray)
+#             if(len(faceArray) != 1):
+#                 clientSocket.sendall(b"FAILURE\n")
+#                 continue
+#             im_data = convertMatFrameTypeToByteFrameType(faceArray[-1])
+#             image_data = base64.b64encode(im_data)
+#             clientSocket.sendall(b"IMAGE\n")
+#             clientSocket.sendall(image_data)
+#             clientSocket.sendall(b"\n")
+
 def realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort, lock):
-    arrayOfByte = bytearray()
     clientSocket.sendall(b"OK\n")
+    arrayOfByte = bytearray()
+    studentId = readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPort)
+    faceAngle = readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPort)
+    folderPath = createFolder(cwd + pathSeparator + "TrainImage" + pathSeparator + studentId) + faceAngle
+    folderPath = createFolder(folderPath)
+    clientSocket.sendall(b"OK\n")
+    count = 1
     while(True):
         signal = readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPort)
         if(signal == "EXIT"):
@@ -304,16 +363,31 @@ def realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort, loc
             imageArray = convert_ByteDataArray_To_Mat(listOfByteArray)
             faceArray = imageArray
             faceArray = collectStaticData(imageArray, lock)
+            # faceArray = faceDectectUsingHaarcascade(imageArray)
             if(len(faceArray) != 1):
                 clientSocket.sendall(b"FAILURE\n")
                 continue
+            storeByteTypeImageToDisk(decode_String_To_Byte(listOfByteArray[0]), folderPath + str(count) + ".jpg")
+            count += 1
             im_data = convertMatFrameTypeToByteFrameType(faceArray[-1])
             image_data = base64.b64encode(im_data)
             clientSocket.sendall(b"IMAGE\n")
             clientSocket.sendall(image_data)
             clientSocket.sendall(b"\n")
 
-    
+def deleteTrainImage(clientSocket, clientSocketArrdress, clientSocketPort):
+    clientSocket.sendall(b"OK\n")
+    studentId = readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPort)
+    imageFolderPath = cwd + pathSeparator + "TrainImage" + pathSeparator + studentId
+    print(imageFolderPath)
+    print(os.path.exists(imageFolderPath))
+    try:
+        removeFolder(imageFolderPath)
+    except:
+        clientSocket.sendall(b"FAILED\n")
+        return
+    clientSocket.sendall(b"SUCCESS\n")
+
 
 def train(clientSocket, clientSocketArrdress, clientSocketPort):
     studentId = ""
@@ -368,13 +442,13 @@ def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSock
     ##################################################################
 
     #Recognize Process using deep learning to detect face and coffe model to recognize face
+    frame = None
     try:
         (name, proba, frame) = ten_image_average(imageList, lock)
         print(name)
         recognizeResult = name
     except:
         print("Exception")
-        frame = None
     ##################################################################
     
 
@@ -408,7 +482,7 @@ def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSock
     clientSocket.sendall(b"IMAGE\n")
     clientSocket.sendall(image_data)
     clientSocket.sendall(b"\n")
-    clientSocket.sendall(b"DONE\n")
+    # clientSocket.sendall(b"DONE\n")
     ##################################################################
 
     # print(recognizeResult)
@@ -421,7 +495,7 @@ def recognize_And_Response_Result(clientSocket, clientSocketArrdress, clientSock
     # clientSocket.sendall(recognizeResult.encode())
     clientSocket.sendall(name.encode())
     clientSocket.sendall(b"\n")
-    clientSocket.sendall(b"DONE\n")
+    # clientSocket.sendall(b"DONE\n")
     
 
 def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort, lock):
@@ -453,6 +527,9 @@ def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort, lock):
             if(clientSignal == "DETECT"):
                 print("detect")
                 realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort, lock)
+            if(clientSignal == "DELETE"):
+                print("DELETE")
+                deleteTrainImage(clientSocket, clientSocketArrdress, clientSocketPort)
                 
         # break
     clientSocket.close()

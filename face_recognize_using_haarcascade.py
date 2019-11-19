@@ -13,6 +13,8 @@ if "\\" in cwd:
     pathSeparator = "\\"
 
 cascPath = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+cascEyePath = cv2.data.haarcascades + 'haarcascade_eye.xml'
+
 # load the image, resize it to have a width of 600 pixels (while
 # maintaining the aspect ratio), and then grab the image dimensions
 # image = cv2.imread("C:\\Users\\Acer\\Documents\\GitHub\\hello\\images\\")
@@ -30,6 +32,8 @@ le = pickle.loads(open(cwd + pathSeparator +"output" + pathSeparator + "le.pickl
 
 
 face_cascade = cv2.CascadeClassifier(cascPath)
+eye_cascade = cv2.CascadeClassifier(cascEyePath)
+
 
 video_capture = cv2.VideoCapture(0)
 
@@ -50,7 +54,9 @@ while True:
             if(w < 100 and h < 100): continue
 
             face = frame[y:y+h, x:x+w]
-
+            roi_gray = gray[y:y+h, x:x+w]
+            # eyes = eye_cascade.detectMultiScale(roi_gray)
+            # for (ex,ey,ew,eh) in eyes:
             faceBlob = cv2.dnn.blobFromImage(face, 1.0 / 255, (96, 96),
                 (0, 0, 0), swapRB=True, crop=False)
 
