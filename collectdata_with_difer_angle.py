@@ -6,7 +6,10 @@ import numpy as np
 
 
 name = input("Name is: ")
-DIR = "Dataset2\\" + str(name) + "\\"
+DIR = "Dataset/" + str(name) + "/"
+
+cwd = os.getcwd()
+pathSeparator = "/"
 
 try:
     os.makedirs(DIR)
@@ -21,13 +24,15 @@ except FileNotFoundError:
 
 # load our serialized face detector from disk
 print("[INFO] loading face detector...")
-detector = cv2.dnn.readNetFromCaffe("C:\\Users\\Acer\\Documents\\GitHub\\hello\\facerecognition-master\\face_detection_model\\deploy.prototxt", 
-   "C:\\Users\\Acer\\Documents\\GitHub\\hello\\facerecognition-master\\face_detection_model\\res10_300x300_ssd_iter_140000.caffemodel")
+detector = cv2.dnn.readNetFromCaffe(cwd + pathSeparator + "facerecognition-master" + pathSeparator
+                                    + "face_detection_model" + pathSeparator + "deploy.prototxt",
+                                    cwd + pathSeparator + "facerecognition-master" + pathSeparator
+                                    + "face_detection_model" + pathSeparator + "res10_300x300_ssd_iter_140000.caffemodel")
 
 
 def gather(sideOfFace, name):
     # name = input("Name is: ")
-    DIR = "Dataset2\\" + str(name) + "\\" + sideOfFace + "\\"
+    DIR = "Dataset/" + str(name) + "/" + sideOfFace + "/"
     print(DIR)
     try:
         os.makedirs(DIR)
@@ -38,8 +43,8 @@ def gather(sideOfFace, name):
         print("can not create file")
     cap = cv2.VideoCapture(0)
     counter = 0
-    
-    while(cap.isOpened() and counter <= 50):
+
+    while(cap.isOpened() and counter <= 20):
         bufferImage = []
         bufferNum = 0
         while(cap.isOpened() and bufferNum < 5):
@@ -83,10 +88,9 @@ def gather(sideOfFace, name):
                 cv2.imshow('image', roi_color)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-        time.sleep(0.1)
+        time.sleep(0.2)
     cap.release()
     cv2.destroyAllWindows()
-
 
     # cv2.namedWindow('image',cv2.WINDOW_NORMAL)
     #cv2.resizeWindow('image', 600,600)
