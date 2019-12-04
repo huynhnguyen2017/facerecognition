@@ -1,10 +1,20 @@
 import numpy as np
 from PIL import Image
 import cv2
+import os
 
 
-net = cv2.dnn.readNetFromCaffe("C:\\Users\\Acer\\Documents\\GitHub\\hello\\facerecognition-master\\face_detection_model\\deploy.prototxt", 
-   "C:\\Users\\Acer\\Documents\\GitHub\\hello\\facerecognition-master\\face_detection_model\\res10_300x300_ssd_iter_140000.caffemodel")
+cwd = os.getcwd()
+pathSeparator = "/"
+if "\\" in cwd:
+    pathSeparator = "\\"
+
+net = cv2.dnn.readNetFromCaffe(cwd + pathSeparator + "facerecognition-master" + pathSeparator 
+    + "face_detection_model" + pathSeparator + "deploy.prototxt", 
+    cwd + pathSeparator + "facerecognition-master" + pathSeparator 
+    + "face_detection_model" + pathSeparator + "res10_300x300_ssd_iter_140000.caffemodel")
+
+
 
 count = 0
 system_path = "C:\\Users\\Acer\\Desktop\\images_for_test\\test\\"
@@ -49,11 +59,11 @@ while True:
 
             roi_gray = gray[startY:endY, startX:endX]
 
-            if count <= numbers_Of_Pic_Collect:
-                img = Image.fromarray(roi_gray)
-                img.save(image_path)
-                # img = frame[y:y+h, x:x+w]
-                # cv.imwrite(image_path, img)
+            # if count <= numbers_Of_Pic_Collect:
+            #     img = Image.fromarray(roi_gray)
+            #     # img.save(image_path)
+            #     # img = frame[y:y+h, x:x+w]
+            #     # cv.imwrite(image_path, img)
 
     cv2.imshow('img', frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):

@@ -43,15 +43,15 @@ embedder = cv2.dnn.readNetFromTorch("nn4.small2.v1.t7")
 recognizer = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "recognizer.pickle", "rb").read())
 le = pickle.loads(open(cwd + pathSeparator + "output" + pathSeparator + "le.pickle", "rb").read())
 
-face_cascade = cv2.CascadeClassifier(cascPath)
-eye_cascade = cv2.CascadeClassifier(cascEyePath)
+# face_cascade = cv2.CascadeClassifier(cascPath)
+# eye_cascade = cv2.CascadeClassifier(cascEyePath)
 
 def ten_image_average(frames, lock):
     stackprob = {}
     track_stack = {}
     named_frame = {}
     print("begin recognize")
-    lock.acquire()
+    # lock.acquire()
     for frame in frames:
         # lock all global var using in recognize
         print("begin recognize")
@@ -126,7 +126,7 @@ def ten_image_average(frames, lock):
 
         # release all global var using in recognize
 
-    lock.release()   
+    # lock.release()   
     try:
         # get maximum value from dictionay
         maxi = max(stackprob.items(), key=operator.itemgetter(1))[0]
@@ -203,7 +203,7 @@ def decode_StringList_To_Byte(listOfByteArray):
     return byteArray
 
 
-def convert_ByteData_To_Mat(imgdata):
+def convert_ByteTypeImage_To_MatTypeImage(imgdata):
     file_bytes = np.fromstring(imgdata, np.uint8)
     frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     return frame
@@ -214,7 +214,7 @@ def convert_ByteDataArray_To_Mat(listOfByteArray):
     for arrayOfByte in listOfByteArray:
         imgdata = decode_String_To_Byte(arrayOfByte)
         # print(len(imgdata))
-        frame = convert_ByteData_To_Mat(imgdata)
+        frame = convert_ByteTypeImage_To_MatTypeImage(imgdata)
         frameList.append(frame)
     return frameList
 
@@ -239,19 +239,51 @@ def faceDectectUsingHaarcascade(frames):
         for (x, y, w, h) in faces:
             if(w < 100 and h < 100): continue
             roi_gray = gray[y:y+h, x:x+w]
-            eyes = eye_cascade.detectMultiScale(roi_gray)
-            for (ex,ey,ew,eh) in eyes:
-                cv2.rectangle(frame, (x,y), (x + w, y + h,), (255, 0, 0, 0), 2)
-                faceArray.append(frame)   
+            # eyes = eye_cascade.detectMultiScale(roi_gray)
+            # for (ex,ey,ew,eh) in eyes:
+            cv2.rectangle(frame, (x,y), (x + w, y + h,), (255, 0, 0, 0), 2)
+            faceArray.append(frame)   
     return faceArray
 
 
+
+def collectStaticData2(imageArray):
+    faceArray = []
+    for frame in imageArray:
+
+        (h, w) = frame.shape[:2]
+
+        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0,
+        (300, 300), (104.0, 177.0, 123.0))
+
+        detector.setInput(blob)
+        detections = detector.forward()
+
+        for i in range(0, detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > 0.5:
+
+                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+                (startX, startY, endX, endY) = box.astype("int")
+
+                text = "{:.2f}%".format(confidence * 100)
+
+                y = startY - 10 if startY - 10 > 10 else startY + 10
+                cv2.rectangle(frame, (startX, startY), (endX, endY),
+                    (0, 0, 255), 2)
+
+                cv2.putText(frame, text, (startX, y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+
+                faceArray.append(frame)
+
+    return faceArray
 
 
 def collectStaticData(imageArray, lock):  # path point to folder including dataset
     faceArray = []
     for image in imageArray:
-        lock.acquire()
+        # lock.acquire()
         # take image from file
         # frame = cv2.imread(image)
         frame = image
@@ -288,7 +320,7 @@ def collectStaticData(imageArray, lock):  # path point to folder including datas
                 roi_color = frame
                 faceArray.append(roi_color)
                 # cv2.imwrite(image, roi_color) # save image into old file with path (  image variable )
-        lock.release()
+        # lock.release()
     return faceArray
 
 
@@ -313,8 +345,8 @@ def readLineFromSocketStream(clientSocket, clientSocketArrdress, clientSocketPor
             break
     return signal
 
-#Convert image from Mat type to byte type
-def convertMatFrameTypeToByteFrameType(frame):
+#Convert image from Mat type to Byte type
+def convert_MatType_Image_To_ByteType_Image(frame):
     im = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     output = BytesIO()
     im.save(output, format='JPEG')
@@ -362,14 +394,15 @@ def realTimeFaceDetect(clientSocket, clientSocketArrdress, clientSocketPort, loc
         if(len(listOfByteArray) == 1):
             imageArray = convert_ByteDataArray_To_Mat(listOfByteArray)
             faceArray = imageArray
-            faceArray = collectStaticData(imageArray, lock)
+            # faceArray = collectStaticData(imageArray, lock)
+            faceArray = collectStaticData2(imageArray)
             # faceArray = faceDectectUsingHaarcascade(imageArray)
             if(len(faceArray) != 1):
                 clientSocket.sendall(b"FAILURE\n")
                 continue
-            storeByteTypeImageToDisk(decode_String_To_Byte(listOfByteArray[0]), folderPath + str(count) + ".jpg")
-            count += 1
-            im_data = convertMatFrameTypeToByteFrameType(faceArray[-1])
+            # storeByteTypeImageToDisk(decode_String_To_Byte(listOfByteArray[0]), folderPath + str(count) + ".jpg")
+            # count += 1
+            im_data = convert_MatType_Image_To_ByteType_Image(faceArray[-1])
             image_data = base64.b64encode(im_data)
             clientSocket.sendall(b"IMAGE\n")
             clientSocket.sendall(image_data)
@@ -530,7 +563,6 @@ def handlle_client(clientSocket, clientSocketArrdress, clientSocketPort, lock):
             if(clientSignal == "DELETE"):
                 print("DELETE")
                 deleteTrainImage(clientSocket, clientSocketArrdress, clientSocketPort)
-                
         # break
     clientSocket.close()
     return
