@@ -1,7 +1,6 @@
 import socket
 import threading
 import numpy as np
-from array import *
 from PIL import Image
 import io
 import base64
@@ -17,10 +16,6 @@ cwd = os.getcwd()
 pathSeparator = "/"
 if "\\" in cwd:
     pathSeparator = "\\"
-
-
-# cascPath = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-# cascEyePath = cv2.data.haarcascades + 'haarcascade_eye.xml'
 
 
 # load our serialized face detector from disk
@@ -49,34 +44,31 @@ def ten_image_average(image, lock):
     frame = 0
     frame = imutils.resize(image, width=600)
     (h, w) = frame.shape[:2]
-    # print("shape ", frame.shape)
-    # print(frame)
     # construct a blob from the image
     imageBlob = cv2.dnn.blobFromImage(
-        cv2.resize(frame, (300, 300)), 1.0, (300, 300),
-        (104.0, 177.0, 123.0), swapRB=False, crop=False)
+        cv2.resize(frame, (300, 300)), 1.0, (300, 300),  # resize image into 300x300; 1.0 not scale color; width and height of blob is 300x300
+        (104.0, 177.0, 123.0), swapRB=False, crop=False) # mean substraction
 
     # apply OpenCV's deep learning-based face detector to localize
     # faces in the input image
     detector.setInput(imageBlob)
-    detections = detector.forward()
-    # print(detections.shape[1])
-    # loop over the detections
+    detections = detector.forward() # [[[[ 0.00000000e+00  1.00000000e+00  9.99997854e-01  3.44877541e-01
+                                    #    2.34312683e-01  6.38702691e-01  7.28359222e-01]
+                                    # [ 0.00000000e+00  1.00000000e+00  1.19440041e-01  1.58040345e-01
+                                    #    4.00908232e+00  8.23799133e-01  4.99118376e+00]]]]
 
     # print("here")
     if len(detections) > 0:
 
         # we're making the assumption that each image has only ONE
         # face, so find the bounding box with the largest probability
-        i = np.argmax(detections[0, 0, :, 2])
-        confidence = detections[0, 0, i, 2]
+        i = np.argmax(detections[0, 0, :, 2]) # get the largest second element of every array
+        confidence = detections[0, 0, i, 2] # get the value
         if confidence > 0.5:
-            # print(frame)
-            # print("confidence ", confidence)
             # compute the (x, y)-coordinates of the bounding box for
             # the face
-            box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-            (startX, startY, endX, endY) = box.astype("int")
+            box = detections[0, 0, i, 3:7] * np.array([w, h, w, h]) # multiple width and height of origin image
+            (startX, startY, endX, endY) = box.astype("int") # convert to integer
 
             # extract the face ROI
             face = frame[startY:endY, startX:endX]
@@ -85,21 +77,20 @@ def ten_image_average(image, lock):
             # ensure the face width and height are sufficiently large
             if fW < 150 or fH < 100:
                 return
-            #     continue
+            
             # construct a blob for the face ROI, then pass the blob
             # through our face embedding model to obtain the 128-d
             # quantification of the face
-            faceBlob = cv2.dnn.blobFromImage(face, 1.0 / 255,
+            faceBlob = cv2.dnn.blobFromImage(face, 1.0 / 255,     # scale color chanels of image
                                              (96, 96), (0, 0, 0), swapRB=True, crop=False)
             embedder.setInput(faceBlob)
-            vec = embedder.forward()
-            # print(vec)
-            # print(fH, fW)
+            vec = embedder.forward()  # 128-d vector
+            
             # perform classification to recognize the face
-            # print(recognizer)
+            # preds (probability of each classes): [[0.20759934 0.09564292 0.00780367 0.64482291 0.04413116]]
             preds = recognizer.predict_proba(vec)[0]
             # print(preds)
-            j = np.argmax(preds)
+            j = np.argmax(preds) # get the position of maximum probability
             proba = preds[j]
             # print(le.classes_[:])
             name = le.classes_[j]
@@ -113,8 +104,10 @@ def ten_image_average(image, lock):
             y = startY - 10 if startY - 10 > 10 else startY + 10
             cv2.rectangle(frame, (startX, startY), (endX, endY),
                           (0, 0, 255), 2)
-            cv2.putText(frame, data, (startX, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+            # 0.45 * basic size of font; 2 is thickness of line; (startX, y) is the position of text
+            cv2.putText(frame, data, (startX, y),  
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2) 
+            
     return (name, proba, frame)  # return label, probability, image
 
 

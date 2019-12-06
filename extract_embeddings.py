@@ -1,7 +1,6 @@
 # import the necessary packages
 from imutils import paths
 import numpy as np
-import argparse
 import imutils
 import pickle
 import cv2
@@ -35,7 +34,6 @@ for (i, imagePath) in enumerate(imagePaths):
     # extract the person name from the image path
     print("[INFO] processing image {}/{}".format(i + 1,
                                                  imagePaths))
-    print()
     name = imagePath.split(os.path.sep)[-2]
 
     # load the image, resize it to have a width of 600 pixels (while
